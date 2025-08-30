@@ -35,6 +35,8 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.io.OutputStream
 
 // 🎯 REAL KROP LIBRARY IMPORTS
@@ -52,6 +54,7 @@ fun ImageCropperScreen(navController: NavController) {
     var croppedImage by remember { mutableStateOf<ImageBitmap?>(null) }
     var showSaveSuccess by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var saveLocation by remember { mutableStateOf<String?>(null) }
 
     // 🎯 USING REAL KROP LIBRARY
     val imageCropper = rememberImageCropper()
@@ -60,7 +63,7 @@ fun ImageCropperScreen(navController: NavController) {
 
     // Permission handling for image selection
     val readPermissionState = rememberPermissionState(
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
@@ -83,34 +86,28 @@ fun ImageCropperScreen(navController: NavController) {
         selectedImageUri = uri
     }
 
-    // FIXED: Proper ImageBitmap to Android Bitmap conversion
+    // IMPROVED: ImageBitmap to Android Bitmap conversion
     fun imageBitmapToBitmap(imageBitmap: ImageBitmap): Bitmap {
         return try {
-            // Try to use the direct conversion method if available
             imageBitmap.asAndroidBitmap()
         } catch (e: Exception) {
-            // Fallback method for older versions or if asAndroidBitmap() fails
             val bitmap = Bitmap.createBitmap(
                 imageBitmap.width,
                 imageBitmap.height,
                 Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
-
-            // Create a paint object for drawing
             val paint = Paint().apply {
                 isAntiAlias = true
                 isFilterBitmap = true
             }
 
-            // Convert ImageBitmap to Android Bitmap properly
             val androidBitmap = Bitmap.createBitmap(
                 imageBitmap.width,
                 imageBitmap.height,
                 Bitmap.Config.ARGB_8888
             )
 
-            // Copy pixel data from ImageBitmap to Android Bitmap
             val pixels = IntArray(imageBitmap.width * imageBitmap.height)
             imageBitmap.readPixels(pixels)
             androidBitmap.setPixels(
@@ -123,51 +120,59 @@ fun ImageCropperScreen(navController: NavController) {
                 imageBitmap.height
             )
 
-            // Draw the bitmap with proper scaling
             canvas.drawBitmap(androidBitmap, 0f, 0f, paint)
-
             bitmap
         }
     }
 
-    // Function to save image to gallery
-    fun saveImageToGallery() {
+    // ENHANCED: Save to both gallery and app scans folder
+    fun saveImageToScans() {
         scope.launch {
             try {
                 croppedImage?.let { imageBitmap ->
                     withContext(Dispatchers.IO) {
-                        // Convert ImageBitmap to Android Bitmap
                         val bitmap = imageBitmapToBitmap(imageBitmap)
 
+                        // Create scans directory if it doesn't exist
+                        val scansDir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Scans")
+                        if (!scansDir.exists()) {
+                            scansDir.mkdirs()
+                        }
+
+                        // Save to app scans folder
+                        val fileName = "Scan_${System.currentTimeMillis()}.jpg"
+                        val scanFile = File(scansDir, fileName)
+
+                        FileOutputStream(scanFile).use { outputStream ->
+                            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)) {
+                                throw Exception("Failed to save scan")
+                            }
+                        }
+
+                        // Also save to gallery
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            // For Android 10 and above
                             saveImageToGalleryQ(bitmap, context)
                         } else {
-                            // For older versions, check permission first
                             if (writePermissionState.status.isGranted) {
                                 saveImageToGalleryLegacy(bitmap, context)
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    writePermissionState.launchPermissionRequest()
-                                }
-                                return@withContext
                             }
                         }
 
                         withContext(Dispatchers.Main) {
+                            saveLocation = scanFile.absolutePath
                             showSaveSuccess = true
                             // Hide success message after 3 seconds
                             launch {
                                 kotlinx.coroutines.delay(3000)
                                 showSaveSuccess = false
+                                saveLocation = null
                             }
                         }
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    saveError = "Failed to save image: ${e.message}"
-                    // Hide error after 3 seconds
+                    saveError = "Failed to save scan: ${e.message}"
                     launch {
                         kotlinx.coroutines.delay(3000)
                         saveError = null
@@ -180,7 +185,6 @@ fun ImageCropperScreen(navController: NavController) {
     // Start cropping when image is selected
     LaunchedEffect(selectedImageUri) {
         selectedImageUri?.let { uri ->
-            // 🎯 USING KROP'S CROP FUNCTION
             when (val result = imageCropper.crop(uri, context)) {
                 is CropResult.Success -> {
                     croppedImage = result.bitmap
@@ -203,42 +207,58 @@ fun ImageCropperScreen(navController: NavController) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header
+        // ENHANCED: Header with better navigation
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Crop,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "Krop Image Cropper",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CropFree,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     )
-                    Text(
-                        text = "Using Version Catalogs + Krop v${getKropVersion()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Document Scanner",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Crop and scan your documents",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                    // Navigation to My Scans
+                    OutlinedButton(
+                        onClick = { navController.navigate("scans") }
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("My Scans")
+                    }
                 }
             }
         }
 
-        // 🎯 KROP CROPPER DIALOG - THE REAL LIBRARY COMPONENT
+        // 🎯 KROP CROPPER DIALOG
         imageCropper.cropState?.let { cropState ->
             ImageCropperDialog(
                 state = cropState,
@@ -273,36 +293,48 @@ fun ImageCropperScreen(navController: NavController) {
             }
         }
 
-        // Success message
+        // ENHANCED: Success message with location
         if (showSaveSuccess) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f)
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Image saved to gallery!",
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Scan saved successfully!",
+                            color = Color(0xFF4CAF50),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    saveLocation?.let { location ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Saved to: ${File(location).name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }
 
         // Error message
-        if (saveError != null) {
+        saveError?.let { error ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -322,14 +354,14 @@ fun ImageCropperScreen(navController: NavController) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Error: ${saveError}",
+                        text = error,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
             }
         }
 
-        // Content area
+        // MAIN CONTENT AREA
         if (croppedImage != null) {
             // Show cropped result
             Card(
@@ -340,11 +372,13 @@ fun ImageCropperScreen(navController: NavController) {
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "✨ Cropped Result",
+                        text = "📄 Scanned Document",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -353,10 +387,10 @@ fun ImageCropperScreen(navController: NavController) {
 
                     Image(
                         bitmap = croppedImage!!,
-                        contentDescription = "Cropped image",
+                        contentDescription = "Scanned document",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp)
+                            .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .border(
                                 2.dp,
@@ -366,36 +400,73 @@ fun ImageCropperScreen(navController: NavController) {
                         contentScale = ContentScale.Fit
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    Row(
+                    // ACTION BUTTONS
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                croppedImage = null
-                            },
-                            modifier = Modifier.weight(1f)
+                        // Save as Scan button (primary action)
+                        Button(
+                            onClick = { saveImageToScans() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Crop Another")
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Save as Scan",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
 
-                        Button(
-                            onClick = { saveImageToGallery() },
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save Image")
+                            // Crop Another button
+                            OutlinedButton(
+                                onClick = { croppedImage = null },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Scan Another")
+                            }
+
+                            // View Scans button
+                            OutlinedButton(
+                                onClick = { navController.navigate("scans") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.Folder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("View Scans")
+                            }
                         }
                     }
                 }
             }
         } else {
-            // Show image picker
+            // ENHANCED: Image selection UI
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -409,31 +480,47 @@ fun ImageCropperScreen(navController: NavController) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    )
+                    // Large scanning icon
+                    Card(
+                        modifier = Modifier.size(120.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        ),
+                        shape = RoundedCornerShape(60.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DocumentScanner,
+                                contentDescription = null,
+                                modifier = Modifier.size(60.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     Text(
-                        text = "Select an image to crop",
-                        style = MaterialTheme.typography.headlineSmall,
+                        text = "Start Scanning",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Experience powerful cropping with Krop library",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Select a document or photo to crop and save as a scan",
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(40.dp))
 
+                    // MAIN ACTION BUTTON
                     Button(
                         onClick = {
                             if (readPermissionState.status.isGranted) {
@@ -442,26 +529,47 @@ fun ImageCropperScreen(navController: NavController) {
                                 readPermissionState.launchPermissionRequest()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
                     ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Choose Image")
+                        Icon(
+                            Icons.Default.PhotoCamera,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Select Document",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
+                    // Permission message
                     if (!readPermissionState.status.isGranted) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Storage permission needed to select images",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Text(
+                                text = "📱 Storage permission is required to select images",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Footer with library info and navigation button
+        // ENHANCED: Footer with app info
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -471,82 +579,78 @@ fun ImageCropperScreen(navController: NavController) {
             )
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    Icons.Default.Code,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Code,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Powered by Krop v${getKropVersion()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                // Quick stats
                 Text(
-                    text = "Built with Krop v${getKropVersion()}",
+                    text = "📁 Tap 'My Scans' to manage",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Navigation button to MyScansScreen
-                TextButton(
-                    onClick = { navController.navigate("scans") }
-                ) {
-                    Icon(
-                        Icons.Default.PhotoLibrary,
-                        contentDescription = "My Scans",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("View My Scans")
-                }
             }
         }
     }
 }
 
-// 🎯 KROP STYLING CONFIGURATION
+// 🎯 ENHANCED KROP STYLING CONFIGURATION
 @Composable
 private fun createKropStyle() = cropperStyle(
     backgroundColor = Color.Black,
     rectColor = MaterialTheme.colorScheme.primary,
-    rectStrokeWidth = 3.dp,
-    overlay = Color.Black.copy(alpha = 0.6f),
-    touchRad = 25.dp,
+    rectStrokeWidth = 4.dp,
+    overlay = Color.Black.copy(alpha = 0.7f),
+    touchRad = 28.dp,
     autoZoom = true,
     aspects = listOf(
         AspectRatio(1, 1),      // Square
+        AspectRatio(4, 3),      // Document (landscape)
+        AspectRatio(3, 4),      // Document (portrait)
         AspectRatio(16, 9),     // Widescreen
-        AspectRatio(9, 16),     // Portrait
-        AspectRatio(4, 3),      // Classic
-        AspectRatio(3, 2),      // Photo,
+        AspectRatio(9, 16),     // Phone screen
+        AspectRatio(3, 2),      // Photo ratio
     ),
     shapes = listOf(
         RectCropShape,
-        CircleCropShape,
-        RoundRectCropShape(15),
-        RoundRectCropShape(25),
-        TriangleCropShape
+        RoundRectCropShape(12),
+        RoundRectCropShape(8),
     ),
     guidelines = CropperStyleGuidelines(
         count = 2,
-        color = Color.White.copy(alpha = 0.5f),
-        width = 1.dp
+        color = Color.White.copy(alpha = 0.6f),
+        width = 1.5.dp
     )
 )
 
-// Helper to get Krop version from BuildConfig (if needed)
+// Helper to get Krop version
 private fun getKropVersion(): String = "0.2.0"
 
-// Function to save image to gallery for Android Q and above
+// ANDROID Q+ SAVE FUNCTION
 private suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context): Uri? {
     return withContext(Dispatchers.IO) {
         val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "Krop_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Scan_${System.currentTimeMillis()}.jpg")
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Krop")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/DocumentScans")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         }
@@ -580,11 +684,11 @@ private suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context): Uri? 
     }
 }
 
-// Function to save image to gallery for legacy Android versions
+// LEGACY ANDROID SAVE FUNCTION
 private suspend fun saveImageToGalleryLegacy(bitmap: Bitmap, context: Context): Uri? {
     return withContext(Dispatchers.IO) {
         val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "Krop_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Scan_${System.currentTimeMillis()}.jpg")
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
         }
 
