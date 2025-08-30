@@ -629,9 +629,11 @@ private fun createKropStyle() = cropperStyle(
         AspectRatio(3, 2),      // Photo ratio
     ),
     shapes = listOf(
-        RectCropShape,
-        RoundRectCropShape(12),
-        RoundRectCropShape(8),
+RectCropShape,
+        CircleCropShape,
+        RoundRectCropShape(15),
+        RoundRectCropShape(25),
+        TriangleCropShape
     ),
     guidelines = CropperStyleGuidelines(
         count = 2,
