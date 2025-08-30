@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -277,21 +279,22 @@ fun MyScansScreen(navController: NavController) {
 
         // MAIN CONTENT
         if (scans.isEmpty()) {
-            // Empty state
+            // Empty state with scrolling
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(32.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(Dimens.largePadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Card(
-                    modifier = Modifier.size(120.dp),
+                    modifier = Modifier.size(Dimens.cardMedium),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     ),
-                    shape = RoundedCornerShape(60.dp)
+                    shape = RoundedCornerShape(Dimens.cornerRadiusLarge)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -300,81 +303,84 @@ fun MyScansScreen(navController: NavController) {
                         Icon(
                             imageVector = Icons.Default.FolderOpen,
                             contentDescription = null,
-                            modifier = Modifier.size(60.dp),
+                            modifier = Modifier.size(Dimens.iconLarge),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(Dimens.extraLargePadding))
 
                 Text(
                     text = "No Scans Yet",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Dimens.mediumPadding))
 
                 Text(
                     text = "Start scanning documents to see them here.\nAll your scans will be organized and ready for PDF export.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(Dimens.extraLargePadding))
 
                 Button(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.DocumentScanner, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(Dimens.mediumPadding))
                     Text("Start Scanning")
                 }
             }
         } else {
             // Scans grid
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Adaptive(Dimens.gridItemMinWidth),
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(Dimens.mediumPadding),
+                verticalArrangement = Arrangement.spacedBy(Dimens.mediumPadding),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.mediumPadding)
             ) {
                 items(scans, key = { it.absolutePath }) { file ->
-                    ScanItem(
-                        file = file,
-                        isSelected = file in selectedScans,
-                        isSelectMode = isSelectMode,
-                        onSelectionChange = { selected ->
-                            if (selected) {
-                                selectedScans.add(file)
-                            } else {
-                                selectedScans.remove(file)
-                            }
-                        },
-                        onLongPress = {
-                            if (!isSelectMode) {
-                                isSelectMode = true
-                                selectedScans.add(file)
-                            }
-                        },
-                        onTap = {
-                            if (isSelectMode) {
-                                if (file in selectedScans) {
-                                    selectedScans.remove(file)
+                    Box(modifier = Modifier.height(Dimens.gridItemHeight)) {
+                        ScanItem(
+                            file = file,
+                            isSelected = file in selectedScans,
+                            isSelectMode = isSelectMode,
+                            onSelectionChange = { selected ->
+                                if (selected) {
+                                    selectedScans.add(file)
                                 } else {
+                                    selectedScans.remove(file)
+                                }
+                            },
+                            onLongPress = {
+                                if (!isSelectMode) {
+                                    isSelectMode = true
                                     selectedScans.add(file)
                                 }
+                            },
+                            onTap = {
+                                if (isSelectMode) {
+                                    if (file in selectedScans) {
+                                        selectedScans.remove(file)
+                                    } else {
+                                        selectedScans.add(file)
+                                    }
+                                }
+                                // Could add preview functionality here later
                             }
-                            // Could add preview functionality here later
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -390,7 +396,7 @@ fun MyScansScreen(navController: NavController) {
                     onClick = { navController.popBackStack() },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(16.dp),
+                        .padding(Dimens.largePadding),
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
                     Icon(
@@ -419,9 +425,10 @@ private fun ScanItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.7f)
-            .clickable { onTap() },
+            .clickable { onTap() }
+            .padding(Dimens.smallPadding),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 8.dp else 4.dp
+            defaultElevation = if (isSelected) Dimens.mediumPadding.value.toInt().dp else Dimens.smallPadding.value.toInt().dp
         ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
@@ -446,7 +453,7 @@ private fun ScanItem(
                     contentDescription = "Scan preview",
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                        .clip(RoundedCornerShape(topStart = Dimens.cornerRadiusMedium, topEnd = Dimens.cornerRadiusMedium)),
                     contentScale = ContentScale.Crop
                 )
 
@@ -455,11 +462,11 @@ private fun ScanItem(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(24.dp)
+                            .padding(Dimens.mediumPadding)
+                            .size(Dimens.iconMedium)
                             .background(
                                 if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
-                                RoundedCornerShape(12.dp)
+                                RoundedCornerShape(Dimens.cornerRadiusMedium)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -468,7 +475,7 @@ private fun ScanItem(
                                 Icons.Default.Check,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(Dimens.iconSmall)
                             )
                         }
                     }
@@ -477,7 +484,7 @@ private fun ScanItem(
 
             // File info
             Column(
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(Dimens.mediumPadding)
             ) {
                 Text(
                     text = file.nameWithoutExtension.take(15) + if (file.nameWithoutExtension.length > 15) "..." else "",
@@ -486,7 +493,7 @@ private fun ScanItem(
                     maxLines = 1
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Dimens.smallPadding))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

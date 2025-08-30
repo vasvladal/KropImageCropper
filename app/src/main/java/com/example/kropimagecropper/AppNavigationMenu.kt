@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -26,7 +27,7 @@ fun AppNavigationMenu(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.mediumPadding.value.toInt().dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -34,7 +35,7 @@ fun AppNavigationMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(Dimens.mediumPadding),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             // Scanner Tab
@@ -56,7 +57,7 @@ fun AppNavigationMenu(
             Divider(
                 modifier = Modifier
                     .width(1.dp)
-                    .height(48.dp),
+                    .height(Dimens.dividerHeight),
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
             )
 
@@ -97,7 +98,7 @@ private fun NavigationTab(
     TextButton(
         onClick = onClick,
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Dimens.cornerRadiusMedium))
             .background(backgroundColor),
         colors = ButtonDefaults.textButtonColors(
             contentColor = contentColor
@@ -111,7 +112,7 @@ private fun NavigationTab(
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(Dimens.responsiveIconSize()),
                     tint = contentColor
                 )
 
@@ -130,11 +131,11 @@ private fun NavigationTab(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(Dimens.smallPadding))
 
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = Dimens.responsiveTextSize()),
                 fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
             )
         }
@@ -152,10 +153,10 @@ fun QuickActionMenu(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.mediumPadding.value.toInt().dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(Dimens.largePadding)
         ) {
             Text(
                 text = "Quick Actions",
@@ -164,11 +165,11 @@ fun QuickActionMenu(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(Dimens.mediumPadding))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Dimens.mediumPadding)
             ) {
                 // Scan Document
                 QuickActionButton(
@@ -221,7 +222,7 @@ private fun QuickActionButton(
     if (isPrimary) {
         Button(
             onClick = onClick,
-            modifier = modifier.height(64.dp),
+            modifier = modifier.height(Dimens.buttonLarge),
             colors = buttonColors,
             enabled = enabled
         ) {
@@ -232,7 +233,7 @@ private fun QuickActionButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = label,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(Dimens.iconMedium)
                     )
                     badge?.let {
                         Badge(
@@ -251,7 +252,7 @@ private fun QuickActionButton(
     } else {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.height(64.dp),
+            modifier = modifier.height(Dimens.buttonLarge),
             colors = buttonColors,
             enabled = enabled
         ) {
@@ -262,7 +263,7 @@ private fun QuickActionButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = label,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(Dimens.iconMedium)
                     )
                     badge?.let {
                         Badge(
@@ -303,7 +304,7 @@ fun AppStatsCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Dimens.largePadding),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -341,9 +342,9 @@ private fun StatItem(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(Dimens.iconMedium)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Dimens.smallPadding))
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,
