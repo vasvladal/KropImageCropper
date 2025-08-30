@@ -1,0 +1,97 @@
+# ========== gradle/libs.versions.toml ==========
+[versions]
+# Kotlin & Compose
+kotlin = "2.2.10"
+compose-bom = "2025.08.01"
+compose-compiler = "1.5.8"
+
+# Android
+android-gradle-plugin = "8.12.2"
+android-core-ktx = "1.17.0"
+android-lifecycle = "2.9.3"
+android-activity-compose = "1.10.1"
+
+# Krop Library - THE MAIN LIBRARY WE'RE INTEGRATING
+krop = "0.2.0"
+
+# Other libraries
+coroutines = "1.10.2"
+accompanist-permissions = "0.37.3"
+coil = "2.7.0"
+
+# Testing
+junit = "4.13.2"
+androidx-test-ext-junit = "1.3.0"
+espresso-core = "3.7.0"
+material3 = "1.3.2"
+navigation-fragment-ktx = "2.9.3"
+navigation-ui-ktx = "2.9.3"
+reorderable = "0.9.6"
+
+navigation-compose = "2.8.3"  # Add this line
+
+[libraries]
+# Android Core
+android-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "android-core-ktx" }
+android-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "android-lifecycle" }
+android-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "android-activity-compose" }
+
+# Compose BOM and UI
+androidx-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# 🎯 KROP LIBRARY DEPENDENCIES
+krop-ui = { group = "com.attafitamim.krop", name = "ui", version.ref = "krop" }
+krop-core = { group = "com.attafitamim.krop", name = "core", version.ref = "krop" }
+krop-extensions-filekit = { group = "com.attafitamim.krop", name = "extensions-filekit", version.ref = "krop" }
+
+# Coroutines
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Permissions
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist-permissions" }
+
+# Image Loading
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso-core" }
+androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigation-fragment-ktx" }
+androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigation-ui-ktx" }
+reorderable = { module = "org.burnoutcrew.composereorderable:reorderable", version.ref = "reorderable" }
+
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose" }  # Add this line
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+[bundles]
+# 🎯 KROP BUNDLE - All Krop related libraries
+krop = ["krop-ui", "krop-extensions-filekit"]
+
+# Compose bundle
+compose = [
+    "compose-ui",
+    "compose-ui-graphics",
+    "compose-ui-tooling-preview",
+    "compose-material3",
+    "compose-material-icons-extended",
+    "androidx-navigation-compose"  # Add this line to include navigation in the compose bundle
+]
+
+# Testing bundle
+testing = ["junit"]
+android-testing = ["androidx-test-ext-junit", "espresso-core", "compose-ui-test-junit4"]
+debug-testing = ["compose-ui-tooling", "compose-ui-test-manifest"]

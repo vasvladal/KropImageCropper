@@ -1,0 +1,17 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+WhatsApp Image 2025-08-30 at 11.16.10_8143895a.jpg
+WhatsApp Image 2025-08-30 at 12.39.23_95dec214.jpg

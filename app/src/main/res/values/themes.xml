@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.KropImageCropper" parent="Theme.KropImageCropper">
+        "Theme.
+        <item name="android:colorPrimary">@color/purple_500</item>
+    </style>
+
+    <style name="Theme.KropImageCropper" parent="Base.Theme.KropImageCropper" />
+</resources>

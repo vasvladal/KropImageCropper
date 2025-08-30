@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Krop Image Cropper</string>
+    <string name="select_image">Select Image</string>
+    <string name="crop_image">Crop Image</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+    <string name="save">Save</string>
+    <string name="new_image">New Image</string>
+    <string name="choose_image">Choose Image</string>
+    <string name="loading_image">Loading image...</string>
+    <string name="processing_crop">Processing crop...</string>
+    <string name="cropped_with_krop">✨ Cropped with Krop Library</string>
+    <string name="image_successfully_cropped">Image successfully cropped using Krop!</string>
+    <string name="select_image_to_crop">Select an image to crop</string>
+    <string name="using_krop_library">Using Krop library for powerful image cropping</string>
+    <string name="powered_by_krop">Powered by Krop v0.2.0 - Compose Multiplatform Image Cropper</string>
+
+    <!-- Add these missing strings -->
+    <string name="action_settings">Settings</string>
+    <string name="first_fragment_label">First Fragment</string>
+    <string name="second_fragment_label">Second Fragment</string>
+</resources>
