@@ -96,4 +96,8 @@ dependencies {
     implementation(libs.reorderable)
 
     implementation(libs.androidx.navigation.compose)
+
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    implementation("androidx.activity:activity-compose") // No version needed
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

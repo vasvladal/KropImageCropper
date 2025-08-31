@@ -15,9 +15,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
-// 🎯 ENHANCED NAVIGATION MENU COMPONENT
 @Composable
 fun AppNavigationMenu(
     currentRoute: String,
@@ -27,7 +27,7 @@ fun AppNavigationMenu(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.mediumPadding.value.toInt().dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -35,7 +35,7 @@ fun AppNavigationMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Dimens.mediumPadding),
+                .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             // Scanner Tab
@@ -54,10 +54,10 @@ fun AppNavigationMenu(
             )
 
             // Divider
-            Divider(
+            HorizontalDivider(
                 modifier = Modifier
                     .width(1.dp)
-                    .height(Dimens.dividerHeight),
+                    .height(48.dp),
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
             )
 
@@ -98,7 +98,7 @@ private fun NavigationTab(
     TextButton(
         onClick = onClick,
         modifier = modifier
-            .clip(RoundedCornerShape(Dimens.cornerRadiusMedium))
+            .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor),
         colors = ButtonDefaults.textButtonColors(
             contentColor = contentColor
@@ -112,7 +112,7 @@ private fun NavigationTab(
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    modifier = Modifier.size(Dimens.responsiveIconSize()),
+                    modifier = Modifier.size(24.dp),
                     tint = contentColor
                 )
 
@@ -131,18 +131,17 @@ private fun NavigationTab(
                 }
             }
 
-            Spacer(modifier = Modifier.height(Dimens.smallPadding))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = Dimens.responsiveTextSize()),
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
                 fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
             )
         }
     }
 }
 
-// 🎯 QUICK ACTION MENU COMPONENT
 @Composable
 fun QuickActionMenu(
     onScanDocument: () -> Unit,
@@ -153,10 +152,10 @@ fun QuickActionMenu(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.mediumPadding.value.toInt().dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
-            modifier = Modifier.padding(Dimens.largePadding)
+            modifier = Modifier.padding(16.dp)
         ) {
             Text(
                 text = "Quick Actions",
@@ -165,11 +164,11 @@ fun QuickActionMenu(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            Spacer(modifier = Modifier.height(Dimens.mediumPadding))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.mediumPadding)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Scan Document
                 QuickActionButton(
@@ -222,7 +221,7 @@ private fun QuickActionButton(
     if (isPrimary) {
         Button(
             onClick = onClick,
-            modifier = modifier.height(Dimens.buttonLarge),
+            modifier = modifier.height(72.dp),
             colors = buttonColors,
             enabled = enabled
         ) {
@@ -233,7 +232,7 @@ private fun QuickActionButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = label,
-                        modifier = Modifier.size(Dimens.iconMedium)
+                        modifier = Modifier.size(24.dp)
                     )
                     badge?.let {
                         Badge(
@@ -252,7 +251,7 @@ private fun QuickActionButton(
     } else {
         OutlinedButton(
             onClick = onClick,
-            modifier = modifier.height(Dimens.buttonLarge),
+            modifier = modifier.height(72.dp),
             colors = buttonColors,
             enabled = enabled
         ) {
@@ -263,7 +262,7 @@ private fun QuickActionButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = label,
-                        modifier = Modifier.size(Dimens.iconMedium)
+                        modifier = Modifier.size(24.dp)
                     )
                     badge?.let {
                         Badge(
@@ -287,7 +286,6 @@ private fun QuickActionButton(
     }
 }
 
-// 🎯 APP STATS COMPONENT
 @Composable
 fun AppStatsCard(
     scanCount: Int,
@@ -304,7 +302,7 @@ fun AppStatsCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Dimens.largePadding),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -342,9 +340,9 @@ private fun StatItem(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(Dimens.iconMedium)
+            modifier = Modifier.size(24.dp)
         )
-        Spacer(modifier = Modifier.height(Dimens.smallPadding))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.titleMedium,

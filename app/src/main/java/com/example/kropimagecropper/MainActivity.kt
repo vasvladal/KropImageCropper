@@ -12,10 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.kropimagecropper.ui.theme.KropImageCropperTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,8 +53,24 @@ fun MainAppNavigation() {
         composable("cropper") {
             ImageCropperScreen(navController)
         }
+
         composable("scans") {
             MyScansScreen(navController)
+        }
+
+        composable(
+            route = "preview/{filePath}",
+            arguments = listOf(
+                navArgument("filePath") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val filePath = backStackEntry.arguments?.getString("filePath") ?: ""
+            PreviewScanScreen(
+                navController = navController,
+                filePath = filePath
+            )
         }
     }
 }

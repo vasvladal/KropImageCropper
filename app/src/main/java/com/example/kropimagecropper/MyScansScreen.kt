@@ -1,22 +1,21 @@
+// File: MyScansScreen.kt
 package com.example.kropimagecropper
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -44,24 +44,24 @@ fun MyScansScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // State management
-    val scanDir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Scans")
+    // Launchers
+    val sharePdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { }
+
+    // State
+    val scanDir = getScansDirectory(context)
     val scans = remember { mutableStateListOf<File>() }
     val selectedScans = remember { mutableStateListOf<File>() }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPdfCreationDialog by remember { mutableStateOf(false) }
     var isSelectMode by remember { mutableStateOf(false) }
 
-    // Load scans when entering screen
+    // Load scans
     LaunchedEffect(Unit) {
-        if (scanDir.exists()) {
+        loadScans(scanDir) { loadedScans ->
             scans.clear()
-            scans.addAll(
-                scanDir.listFiles()
-                    ?.filter { it.isFile && it.extension.lowercase() in listOf("jpg", "jpeg", "png") }
-                    ?.sortedByDescending { it.lastModified() } // Newest first
-                    ?: emptyList()
-            )
+            scans.addAll(loadedScans)
         }
     }
 
@@ -76,21 +76,13 @@ fun MyScansScreen(navController: NavController) {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = if (isSelectMode) "Select Scans" else "My Scans",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (scans.isNotEmpty()) {
-                            Text(
-                                text = "${scans.size} scan${if (scans.size != 1) "s" else ""}" +
-                                        if (selectedScans.isNotEmpty()) " • ${selectedScans.size} selected" else "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
+                    Text(
+                        text = if (isSelectMode) {
+                            if (selectedScans.isNotEmpty()) "${selectedScans.size} selected" else "Select Scans"
+                        } else "My Scans",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = {
@@ -101,126 +93,112 @@ fun MyScansScreen(navController: NavController) {
                         }
                     }) {
                         Icon(
-                            if (isSelectMode) Icons.Default.Close else Icons.Default.ArrowBack,
+                            imageVector = if (isSelectMode) Icons.Default.Close else Icons.Default.ArrowBack,
                             contentDescription = if (isSelectMode) "Cancel" else "Back"
                         )
                     }
                 },
                 actions = {
                     if (scans.isNotEmpty()) {
-                        // Select/Deselect all button
                         if (isSelectMode) {
-                            TextButton(
-                                onClick = {
-                                    if (selectedScans.size == scans.size) {
-                                        selectedScans.clear()
-                                    } else {
-                                        selectedScans.clear()
-                                        selectedScans.addAll(scans)
-                                    }
+                            // Share button only in top bar during selection
+                            if (selectedScans.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    createAndSharePdf(context, selectedScans.toList(), sharePdfLauncher)
+                                }) {
+                                    Icon(
+                                        Icons.Default.Share,
+                                        contentDescription = "Share",
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
-                            ) {
-                                Text(
-                                    if (selectedScans.size == scans.size) "Deselect All" else "Select All"
-                                )
                             }
-                        }
-
-                        // Create PDF button
-                        IconButton(
-                            onClick = {
-                                if (selectedScans.isNotEmpty()) {
-                                    showPdfCreationDialog = true
-                                } else if (!isSelectMode) {
+                        } else {
+                            Row {
+                                // Quick select button
+                                IconButton(onClick = {
                                     isSelectMode = true
-                                } else {
-                                    Toast.makeText(context, "Select scans first", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Icon(
+                                        Icons.Default.Checklist,
+                                        contentDescription = "Select",
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
-                            },
-                            enabled = if (isSelectMode) selectedScans.isNotEmpty() else true
-                        ) {
-                            Icon(
-                                Icons.Default.PictureAsPdf,
-                                contentDescription = "Create PDF",
-                                tint = if (isSelectMode && selectedScans.isEmpty())
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                else MaterialTheme.colorScheme.primary
-                            )
-                        }
 
-                        // Delete button (only in select mode)
-                        if (isSelectMode) {
-                            IconButton(
-                                onClick = {
-                                    if (selectedScans.isNotEmpty()) {
-                                        showDeleteDialog = true
-                                    } else {
-                                        Toast.makeText(context, "Select scans to delete", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                enabled = selectedScans.isNotEmpty()
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = if (selectedScans.isEmpty())
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                    else MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
+                                // More menu
+                                var showMenu by remember { mutableStateOf(false) }
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "Menu",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
 
-                        // Menu button for other actions
-                        if (!isSelectMode) {
-                            var showMenu by remember { mutableStateOf(false) }
-
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                            }
-
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Select Multiple") },
-                                    onClick = {
-                                        showMenu = false
-                                        isSelectMode = true
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Checklist, contentDescription = null)
-                                    },
-                                    enabled = scans.isNotEmpty()
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Delete All") },
-                                    onClick = {
-                                        showMenu = false
-                                        selectedScans.clear()
-                                        selectedScans.addAll(scans)
-                                        showDeleteDialog = true
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.DeleteForever, contentDescription = null)
-                                    },
-                                    enabled = scans.isNotEmpty()
-                                )
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Select Multiple") },
+                                        leadingIcon = { Icon(Icons.Default.Checklist, null) },
+                                        onClick = { showMenu = false; isSelectMode = true }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Delete All") },
+                                        leadingIcon = { Icon(Icons.Default.DeleteForever, null) },
+                                        onClick = {
+                                            showMenu = false
+                                            selectedScans.clear()
+                                            selectedScans.addAll(scans)
+                                            showDeleteDialog = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (isSelectMode) {
+                SelectionBottomBar(
+                    selectedCount = selectedScans.size,
+                    totalCount = scans.size,
+                    onSelectAll = {
+                        if (selectedScans.size == scans.size) {
+                            selectedScans.clear()
+                        } else {
+                            selectedScans.clear()
+                            selectedScans.addAll(scans)
+                        }
+                    },
+                    onDelete = { showDeleteDialog = true },
+                    onCreatePdf = { showPdfCreationDialog = true }
+                )
+            }
+        },
+        floatingActionButton = {
+            if (scans.isNotEmpty() && !isSelectMode) {
+                FloatingActionButton(
+                    onClick = { navController.popBackStack() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "New Scan")
+                }
+            }
         }
-    ) { padding ->
+    ) { paddingValues ->
 
-        // DELETE CONFIRMATION DIALOG
+        // DELETE DIALOG
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
                 title = { Text("Delete Scans") },
                 text = {
-                    Text("Are you sure you want to delete ${selectedScans.size} scan${if (selectedScans.size != 1) "s" else ""}? This action cannot be undone.")
+                    Text(
+                        "Are you sure you want to delete ${selectedScans.size} scan${if (selectedScans.size != 1) "s" else ""}? This cannot be undone."
+                    )
                 },
                 confirmButton = {
                     TextButton(
@@ -247,19 +225,17 @@ fun MyScansScreen(navController: NavController) {
             )
         }
 
-        // PDF CREATION DIALOG
+        // PDF CREATION DIALOG (Save to app)
         if (showPdfCreationDialog) {
             AlertDialog(
                 onDismissRequest = { showPdfCreationDialog = false },
                 title = { Text("Create PDF") },
-                text = {
-                    Text("Create a PDF from ${selectedScans.size} selected scan${if (selectedScans.size != 1) "s" else ""}?")
-                },
+                text = { Text("Create a PDF from ${selectedScans.size} selected scan(s)?") },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             scope.launch {
-                                createPdfFromImages(context, selectedScans.toList())
+                                createPdfAndSave(context, selectedScans.toList())
                                 showPdfCreationDialog = false
                                 isSelectMode = false
                                 selectedScans.clear()
@@ -277,133 +253,168 @@ fun MyScansScreen(navController: NavController) {
             )
         }
 
-        // MAIN CONTENT
+        // EMPTY STATE
         if (scans.isEmpty()) {
-            // Empty state with scrolling
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
-                    .padding(Dimens.largePadding),
+                    .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Card(
-                    modifier = Modifier.size(Dimens.cardMedium),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    ),
-                    shape = RoundedCornerShape(Dimens.cornerRadiusLarge)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimens.iconLarge),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(Dimens.extraLargePadding))
-
+                Icon(
+                    Icons.Default.FolderOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "No Scans Yet",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(Dimens.mediumPadding))
-
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Start scanning documents to see them here.\nAll your scans will be organized and ready for PDF export.",
+                    text = "Your scanned documents will appear here.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(Dimens.extraLargePadding))
-
+                Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.DocumentScanner, contentDescription = null)
-                    Spacer(modifier = Modifier.width(Dimens.mediumPadding))
+                    Icon(Icons.Default.DocumentScanner, null)
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Start Scanning")
                 }
             }
         } else {
-            // Scans grid
+            // SCAN GRID
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(Dimens.gridItemMinWidth),
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(Dimens.mediumPadding),
-                verticalArrangement = Arrangement.spacedBy(Dimens.mediumPadding),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.mediumPadding)
+                columns = GridCells.Adaptive(150.dp),
+                contentPadding = PaddingValues(
+                    top = paddingValues.calculateTopPadding(),
+                    start = 8.dp,
+                    end = 8.dp,
+                    bottom = if (isSelectMode) 80.dp else paddingValues.calculateBottomPadding()
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize()
             ) {
                 items(scans, key = { it.absolutePath }) { file ->
-                    Box(modifier = Modifier.height(Dimens.gridItemHeight)) {
-                        ScanItem(
-                            file = file,
-                            isSelected = file in selectedScans,
-                            isSelectMode = isSelectMode,
-                            onSelectionChange = { selected ->
-                                if (selected) {
-                                    selectedScans.add(file)
-                                } else {
-                                    selectedScans.remove(file)
-                                }
-                            },
-                            onLongPress = {
-                                if (!isSelectMode) {
-                                    isSelectMode = true
-                                    selectedScans.add(file)
-                                }
-                            },
-                            onTap = {
-                                if (isSelectMode) {
-                                    if (file in selectedScans) {
-                                        selectedScans.remove(file)
-                                    } else {
-                                        selectedScans.add(file)
-                                    }
-                                }
-                                // Could add preview functionality here later
+                    ScanItem(
+                        file = file,
+                        isSelected = file in selectedScans,
+                        isSelectMode = isSelectMode,
+                        onSelectionChange = { selected ->
+                            if (selected) {
+                                if (file !in selectedScans) selectedScans.add(file)
+                            } else {
+                                selectedScans.remove(file)
                             }
-                        )
-                    }
+                        },
+                        onLongPress = {
+                            if (!isSelectMode) {
+                                isSelectMode = true
+                                if (file !in selectedScans) selectedScans.add(file)
+                            }
+                        },
+                        onTap = {
+                            if (isSelectMode) {
+                                if (file in selectedScans) {
+                                    selectedScans.remove(file)
+                                } else {
+                                    selectedScans.add(file)
+                                }
+                            } else {
+                                // Open preview screen - encode the path properly
+                                navController.navigate("preview/${Uri.encode(file.absolutePath)}")
+                            }
+                        }
+                    )
                 }
             }
         }
+    }
+}
 
-        // FLOATING ACTION BUTTON for quick actions
-        if (scans.isNotEmpty() && !isSelectMode) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
+@Composable
+private fun SelectionBottomBar(
+    selectedCount: Int,
+    totalCount: Int,
+    onSelectAll: () -> Unit,
+    onDelete: () -> Unit,
+    onCreatePdf: () -> Unit
+) {
+    Surface(
+        tonalElevation = 16.dp,
+        shadowElevation = 16.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(70.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Select All/None button
+            TextButton(
+                onClick = onSelectAll,
+                modifier = Modifier.weight(1f)
             ) {
-                FloatingActionButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(Dimens.largePadding),
-                    containerColor = MaterialTheme.colorScheme.primary
+                Text(
+                    text = if (selectedCount == totalCount) "Select None" else "Select All",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Action buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Create PDF button
+                FilledTonalButton(
+                    onClick = onCreatePdf,
+                    enabled = selectedCount > 0,
+                    modifier = Modifier.height(40.dp)
                 ) {
                     Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Add New Scan",
-                        tint = Color.White
+                        Icons.Default.PictureAsPdf,
+                        contentDescription = "Create PDF",
+                        modifier = Modifier.size(20.dp)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("PDF")
+                }
+
+                // Delete button
+                FilledTonalButton(
+                    onClick = onDelete,
+                    enabled = selectedCount > 0,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete")
                 }
             }
         }
@@ -419,16 +430,20 @@ private fun ScanItem(
     onLongPress: () -> Unit,
     onTap: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
+    val context = LocalContext.current
+    val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.7f)
-            .clickable { onTap() }
-            .padding(Dimens.smallPadding),
+            .widthIn(min = 150.dp)
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = onLongPress
+            )
+            .padding(4.dp),
+        shape = RoundedCornerShape(8.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) Dimens.mediumPadding.value.toInt().dp else Dimens.smallPadding.value.toInt().dp
+            defaultElevation = if (isSelected) 8.dp else 4.dp
         ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
@@ -439,34 +454,34 @@ private fun ScanItem(
             BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         else null
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Image preview
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                val painter = rememberAsyncImagePainter(
+                    ImageRequest.Builder(context)
+                        .data(file)
+                        .placeholder(android.R.drawable.ic_menu_gallery)
+                        .error(android.R.drawable.ic_menu_report_image)
+                        .build()
+                )
                 Image(
-                    painter = rememberAsyncImagePainter(file),
+                    painter = painter,
                     contentDescription = "Scan preview",
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = Dimens.cornerRadiusMedium, topEnd = Dimens.cornerRadiusMedium)),
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
                     contentScale = ContentScale.Crop
                 )
 
-                // Selection indicator
+                // Selection overlay
                 if (isSelectMode) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(Dimens.mediumPadding)
-                            .size(Dimens.iconMedium)
+                            .padding(8.dp)
+                            .size(24.dp)
                             .background(
                                 if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
-                                RoundedCornerShape(Dimens.cornerRadiusMedium)
+                                RoundedCornerShape(8.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -475,7 +490,7 @@ private fun ScanItem(
                                 Icons.Default.Check,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(Dimens.iconSmall)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -483,18 +498,14 @@ private fun ScanItem(
             }
 
             // File info
-            Column(
-                modifier = Modifier.padding(Dimens.mediumPadding)
-            ) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     text = file.nameWithoutExtension.take(15) + if (file.nameWithoutExtension.length > 15) "..." else "",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1
                 )
-
-                Spacer(modifier = Modifier.height(Dimens.smallPadding))
-
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -505,7 +516,6 @@ private fun ScanItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-
                     Text(
                         text = "${(file.length() / 1024).toInt()} KB",
                         style = MaterialTheme.typography.bodySmall,
@@ -517,8 +527,27 @@ private fun ScanItem(
     }
 }
 
-// ENHANCED: PDF Creation with better error handling
-suspend fun createPdfFromImages(context: Context, files: List<File>) {
+// App-private scan directory
+fun getScansDirectory(context: Context): File {
+    return File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Scans").apply {
+        if (!exists()) mkdirs()
+    }
+}
+
+// Load scans
+suspend fun loadScans(dir: File, onResult: (List<File>) -> Unit) {
+    if (dir.exists() && dir.isDirectory) {
+        val files = dir.listFiles { f ->
+            f.isFile && f.extension.lowercase() in listOf("jpg", "jpeg", "png")
+        }?.sortedByDescending { it.lastModified() } ?: emptyList()
+        onResult(files)
+    } else {
+        onResult(emptyList())
+    }
+}
+
+// Save PDF to app storage
+suspend fun createPdfAndSave(context: Context, files: List<File>) {
     if (files.isEmpty()) {
         Toast.makeText(context, "No files selected", Toast.LENGTH_SHORT).show()
         return
@@ -526,52 +555,92 @@ suspend fun createPdfFromImages(context: Context, files: List<File>) {
 
     try {
         val pdfDocument = PdfDocument()
-        val sortedFiles = files.sortedBy { it.name } // Sort by name for consistent order
+        val sortedFiles = files.sortedBy { it.name }
 
-        sortedFiles.forEachIndexed { index, file ->
+        for ((index, file) in sortedFiles.withIndex()) {
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: continue
             try {
-                val bitmap = BitmapFactory.decodeFile(file.path)
-                if (bitmap != null) {
-                    val pageInfo = PdfDocument.PageInfo.Builder(
-                        bitmap.width,
-                        bitmap.height,
-                        index + 1
-                    ).create()
-
-                    val page = pdfDocument.startPage(pageInfo)
-                    page.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                    pdfDocument.finishPage(page)
-                    bitmap.recycle() // Free memory
-                } else {
-                    throw Exception("Could not decode image: ${file.name}")
-                }
+                val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
+                val page = pdfDocument.startPage(pageInfo)
+                page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                pdfDocument.finishPage(page)
             } catch (e: Exception) {
-                Toast.makeText(context, "Error processing ${file.name}: ${e.message}", Toast.LENGTH_LONG).show()
+                pdfDocument.close()
+                Toast.makeText(context, "Error on page ${index + 1}", Toast.LENGTH_SHORT).show()
+                return
+            } finally {
+                if (!bitmap.isRecycled) bitmap.recycle()
             }
         }
 
-        // Save PDF
-        val pdfDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "PDFs")
-        if (!pdfDir.exists()) {
-            pdfDir.mkdirs()
+        val pdfDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "PDFs").apply {
+            if (!exists()) mkdirs()
         }
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
         val pdfFile = File(pdfDir, "Scans_${timestamp}.pdf")
 
-        FileOutputStream(pdfFile).use { outputStream ->
-            pdfDocument.writeTo(outputStream)
+        try {
+            FileOutputStream(pdfFile).use { pdfDocument.writeTo(it) }
+            Toast.makeText(context, "✅ PDF saved: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to save PDF", Toast.LENGTH_LONG).show()
         }
 
         pdfDocument.close()
 
-        Toast.makeText(
+    } catch (e: Exception) {
+        Toast.makeText(context, "PDF creation failed: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+// Create and share PDF
+fun createAndSharePdf(
+    context: Context,
+    files: List<File>,
+    shareLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
+) {
+    if (files.isEmpty()) return
+
+    try {
+        val pdfDocument = PdfDocument()
+        val sortedFiles = files.sortedBy { it.name }
+
+        for ((index, file) in sortedFiles.withIndex()) {
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: continue
+            try {
+                val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
+                val page = pdfDocument.startPage(pageInfo)
+                page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                pdfDocument.finishPage(page)
+            } catch (e: Exception) {
+                pdfDocument.close()
+                Toast.makeText(context, "Error creating PDF", Toast.LENGTH_SHORT).show()
+                return
+            } finally {
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+        }
+
+        val cachePdf = File(context.cacheDir, "shared_scans.pdf")
+        FileOutputStream(cachePdf).use { pdfDocument.writeTo(it) }
+        pdfDocument.close()
+
+        val uri = androidx.core.content.FileProvider.getUriForFile(
             context,
-            "PDF created: ${pdfFile.name}\nLocation: ${pdfFile.absolutePath}",
-            Toast.LENGTH_LONG
-        ).show()
+            "${context.packageName}.fileprovider",
+            cachePdf
+        )
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        shareLauncher.launch(Intent.createChooser(intent, "Share PDF"))
 
     } catch (e: Exception) {
-        Toast.makeText(context, "Failed to create PDF: ${e.message}", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Failed to share PDF: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
