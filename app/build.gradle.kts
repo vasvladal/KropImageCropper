@@ -42,6 +42,7 @@ android {
     }
 
     buildFeatures {
+        viewBinding = true
         compose = true
     }
 
@@ -97,7 +98,13 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    implementation("androidx.activity:activity-compose") // No version needed
-    implementation("io.coil-kt:coil-compose:2.6.0")
+        //implementation(libs.androidx.compose.bom.v20240600)
+    implementation(libs.androidx.activity.compose) // No version needed
+    implementation(libs.coil.compose)
+
+    // Navigation dependencies
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
+// ViewBinding
+    implementation(libs.androidx.fragment.ktx)
 }

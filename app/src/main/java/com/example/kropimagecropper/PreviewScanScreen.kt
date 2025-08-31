@@ -1,4 +1,3 @@
-// File: PreviewScanScreen.kt
 package com.example.kropimagecropper
 
 import android.app.AlertDialog
@@ -27,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -49,9 +49,14 @@ fun PreviewScanScreen(
     val scrollState = rememberScrollState()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // Get string resources
+    val scanNotFound = stringResource(R.string.scan_not_found)
+    val scanDeleted = stringResource(R.string.scan_deleted)
+    val deleteFailed = stringResource(R.string.delete_failed)
+
     if (!file.exists()) {
         LaunchedEffect(Unit) {
-            Toast.makeText(context, "Scan not found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, scanNotFound, Toast.LENGTH_SHORT).show()
             navController.popBackStack()
         }
         return
@@ -65,7 +70,7 @@ fun PreviewScanScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Preview Scan", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.preview_scan), style = MaterialTheme.typography.headlineSmall)
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -95,26 +100,26 @@ fun PreviewScanScreen(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Delete Scan") },
-                text = { Text("Are you sure you want to delete this scan? This cannot be undone.") },
+                title = { Text(stringResource(R.string.delete_scan)) },
+                text = { Text(stringResource(R.string.delete_scan_confirmation)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             if (file.delete()) {
-                                Toast.makeText(context, "Scan deleted", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, scanDeleted, Toast.LENGTH_SHORT).show()
                                 navController.popBackStack()
                             } else {
-                                Toast.makeText(context, "Failed to delete", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, deleteFailed, Toast.LENGTH_SHORT).show()
                             }
                             showDeleteDialog = false
                         }
                     ) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                 }
             )
@@ -145,7 +150,7 @@ fun PreviewScanScreen(
                 )
                 Image(
                     painter = painter,
-                    contentDescription = "Scan preview",
+                    contentDescription = stringResource(R.string.scan_preview),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -158,14 +163,14 @@ fun PreviewScanScreen(
                     .padding(horizontal = 16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("File Info", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.file_info), style = MaterialTheme.typography.headlineSmall)
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    InfoRow("Name", file.name)
-                    InfoRow("Size", "${(file.length() / 1024).toInt()} KB")
-                    InfoRow("Modified", SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(file.lastModified())))
-                    InfoRow("Location", file.parentFile?.name ?: "Unknown")
+                    InfoRow(stringResource(R.string.file_name), file.name)
+                    InfoRow(stringResource(R.string.file_size), "${(file.length() / 1024).toInt()} KB")
+                    InfoRow(stringResource(R.string.file_modified), SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(file.lastModified())))
+                    InfoRow(stringResource(R.string.file_location), file.parentFile?.name ?: stringResource(R.string.unknown))
                 }
             }
 

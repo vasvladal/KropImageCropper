@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,7 +42,7 @@ fun AppNavigationMenu(
             // Scanner Tab
             NavigationTab(
                 icon = Icons.Default.DocumentScanner,
-                label = "Scanner",
+                label = stringResource(R.string.scanner_tab),
                 isActive = currentRoute == "cropper",
                 onClick = {
                     if (currentRoute != "cropper") {
@@ -64,7 +65,7 @@ fun AppNavigationMenu(
             // My Scans Tab
             NavigationTab(
                 icon = Icons.Default.Folder,
-                label = "My Scans",
+                label = stringResource(R.string.my_scans_tab),
                 badge = if (scanCount > 0) scanCount.toString() else null,
                 isActive = currentRoute == "scans",
                 onClick = {
@@ -158,7 +159,7 @@ fun QuickActionMenu(
             modifier = Modifier.padding(16.dp)
         ) {
             Text(
-                text = "Quick Actions",
+                text = stringResource(R.string.quick_actions),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -173,7 +174,7 @@ fun QuickActionMenu(
                 // Scan Document
                 QuickActionButton(
                     icon = Icons.Default.DocumentScanner,
-                    label = "New Scan",
+                    label = stringResource(R.string.new_scan),
                     onClick = onScanDocument,
                     modifier = Modifier.weight(1f),
                     isPrimary = true
@@ -182,7 +183,7 @@ fun QuickActionMenu(
                 // View Scans
                 QuickActionButton(
                     icon = Icons.Default.Folder,
-                    label = "View Scans",
+                    label = stringResource(R.string.view_scans),
                     badge = if (scanCount > 0) scanCount.toString() else null,
                     onClick = onViewScans,
                     modifier = Modifier.weight(1f),
@@ -192,7 +193,7 @@ fun QuickActionMenu(
                 // Create PDF
                 QuickActionButton(
                     icon = Icons.Default.PictureAsPdf,
-                    label = "Create PDF",
+                    label = stringResource(R.string.create_pdf),
                     onClick = onCreatePdf,
                     modifier = Modifier.weight(1f),
                     enabled = scanCount > 0
@@ -309,19 +310,19 @@ fun AppStatsCard(
             StatItem(
                 icon = Icons.Default.Description,
                 value = scanCount.toString(),
-                label = "Scans"
+                label = stringResource(R.string.scans)
             )
 
             StatItem(
                 icon = Icons.Default.Storage,
                 value = totalSize,
-                label = "Storage"
+                label = stringResource(R.string.storage)
             )
 
             StatItem(
                 icon = Icons.Default.Schedule,
-                value = lastScanDate ?: "Never",
-                label = "Last Scan"
+                value = lastScanDate ?: stringResource(R.string.never),
+                label = stringResource(R.string.last_scan)
             )
         }
     }

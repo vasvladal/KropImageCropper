@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,8 +49,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
-
-
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ImageCropperScreen(navController: NavController) {
@@ -65,7 +64,14 @@ fun ImageCropperScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    // Permission handling for image selection
+    // Get string resources
+    val failedToSaveScan = stringResource(R.string.failed_to_save_scan)
+    val storagePermissionRequired = stringResource(R.string.storage_permission_required)
+    val failedToCompressBitmap = stringResource(R.string.failed_to_compress_bitmap)
+    val cropErrorString = stringResource(R.string.crop_error)
+    val saveFailedString = stringResource(R.string.save_failed)
+
+    // FIXED: Permission handling for image selection
     val readPermissionState = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
@@ -74,7 +80,7 @@ fun ImageCropperScreen(navController: NavController) {
         }
     )
 
-    // Permission handling for saving images
+    // FIXED: Permission handling for saving images
     val writePermissionState = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
@@ -88,6 +94,13 @@ fun ImageCropperScreen(navController: NavController) {
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         selectedImageUri = uri
+    }
+
+    // Handle permission request result
+    LaunchedEffect(readPermissionState.status) {
+        if (readPermissionState.status.isGranted) {
+            imagePickerLauncher.launch("image/*")
+        }
     }
 
     // ✅ Convert ImageBitmap to Android Bitmap (simple and safe)
@@ -118,18 +131,18 @@ fun ImageCropperScreen(navController: NavController) {
 
                         FileOutputStream(scanFile).use { outputStream ->
                             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)) {
-                                throw Exception("Failed to save scan")
+                                throw Exception(failedToSaveScan)
                             }
                         }
 
                         // Save to gallery
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            saveImageToGalleryQ(bitmap, context)
+                            saveImageToGalleryQ(bitmap, context, failedToCompressBitmap)
                         } else {
                             if (writePermissionState.status.isGranted) {
-                                saveImageToGalleryLegacy(bitmap, context)
+                                saveImageToGalleryLegacy(bitmap, context, failedToCompressBitmap)
                             } else {
-                                throw Exception("Storage permission required")
+                                throw Exception(storagePermissionRequired)
                             }
                         }
 
@@ -146,7 +159,7 @@ fun ImageCropperScreen(navController: NavController) {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    saveError = "Failed to save scan: ${e.message}"
+                    saveError = String.format(saveFailedString, e.message ?: "")
                     scope.launch {
                         kotlinx.coroutines.delay(3000)
                         saveError = null
@@ -169,7 +182,7 @@ fun ImageCropperScreen(navController: NavController) {
                 }
                 is CropError -> {
                     selectedImageUri = null
-                    saveError = "Error cropping image"
+                    saveError = cropErrorString
                 }
             }
         }
@@ -210,12 +223,12 @@ fun ImageCropperScreen(navController: NavController) {
                         Spacer(modifier = Modifier.width(Dimens.mediumPadding))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Document Scanner",
+                                text = stringResource(R.string.document_scanner),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Crop and scan your documents",
+                                text = stringResource(R.string.crop_and_scan),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
@@ -223,7 +236,7 @@ fun ImageCropperScreen(navController: NavController) {
                         OutlinedButton(onClick = { navController.navigate("scans") }) {
                             Icon(Icons.Default.Folder, null, Modifier.size(Dimens.iconSmall))
                             Spacer(modifier = Modifier.width(Dimens.smallPadding))
-                            Text("My Scans")
+                            Text(stringResource(R.string.my_scans))
                         }
                     }
                 }
@@ -253,8 +266,8 @@ fun ImageCropperScreen(navController: NavController) {
                         Spacer(modifier = Modifier.height(Dimens.largePadding))
                         Text(
                             text = when (status) {
-                                CropperLoading.PreparingImage -> "Loading image..."
-                                CropperLoading.SavingResult -> "Processing crop..."
+                                CropperLoading.PreparingImage -> stringResource(R.string.loading_image)
+                                CropperLoading.SavingResult -> stringResource(R.string.processing_crop)
                             },
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -275,7 +288,7 @@ fun ImageCropperScreen(navController: NavController) {
                             Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF4CAF50))
                             Spacer(modifier = Modifier.width(Dimens.mediumPadding))
                             Text(
-                                text = "Scan saved successfully!",
+                                text = stringResource(R.string.scan_saved),
                                 color = Color(0xFF4CAF50),
                                 fontWeight = FontWeight.Medium
                             )
@@ -283,7 +296,7 @@ fun ImageCropperScreen(navController: NavController) {
                         saveLocation?.let { location ->
                             Spacer(modifier = Modifier.height(Dimens.smallPadding))
                             Text(
-                                text = "Saved to: ${File(location).name}",
+                                text = stringResource(R.string.saved_to, File(location).name),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -321,7 +334,7 @@ fun ImageCropperScreen(navController: NavController) {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "📄 Scanned Document",
+                                text = stringResource(R.string.scanned_document),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -330,7 +343,7 @@ fun ImageCropperScreen(navController: NavController) {
 
                             Image(
                                 bitmap = croppedImage!!,
-                                contentDescription = "Scanned document",
+                                contentDescription = stringResource(R.string.scanned_document),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
@@ -355,19 +368,19 @@ fun ImageCropperScreen(navController: NavController) {
                                 ) {
                                     Icon(Icons.Default.Save, null, Modifier.size(Dimens.iconSmall))
                                     Spacer(modifier = Modifier.width(Dimens.mediumPadding))
-                                    Text("Save as Scan", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                    Text(stringResource(R.string.save_as_scan), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                                 }
 
                                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dimens.smallPadding)) {
                                     OutlinedButton(onClick = { croppedImage = null }, modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Default.Refresh, null, Modifier.size(Dimens.iconSmall))
                                         Spacer(modifier = Modifier.width(Dimens.mediumPadding))
-                                        Text("Scan Another")
+                                        Text(stringResource(R.string.scan_another))
                                     }
                                     OutlinedButton(onClick = { navController.navigate("scans") }, modifier = Modifier.fillMaxWidth()) {
                                         Icon(Icons.Default.Folder, null, Modifier.size(Dimens.iconSmall))
                                         Spacer(modifier = Modifier.width(Dimens.mediumPadding))
-                                        Text("View Scans")
+                                        Text(stringResource(R.string.view_scans))
                                     }
                                 }
                             }
@@ -401,14 +414,14 @@ fun ImageCropperScreen(navController: NavController) {
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Start Scanning",
+                                    text = stringResource(R.string.start_scanning),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(Dimens.mediumPadding))
                                 Text(
-                                    text = "Select a document or photo to crop and save as a scan",
+                                    text = stringResource(R.string.select_document_hint),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                     textAlign = TextAlign.Center
@@ -431,14 +444,14 @@ fun ImageCropperScreen(navController: NavController) {
                                 ) {
                                     Icon(Icons.Default.PhotoCamera, null, Modifier.size(Dimens.iconSmall))
                                     Spacer(modifier = Modifier.width(Dimens.mediumPadding))
-                                    Text("Select Document", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                    Text(stringResource(R.string.select_document), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                                 }
 
                                 if (!readPermissionState.status.isGranted) {
                                     Spacer(modifier = Modifier.height(Dimens.largePadding))
                                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))) {
                                         Text(
-                                            text = "📱 Storage permission is required to select images",
+                                            text = stringResource(R.string.storage_permission_hint),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.padding(Dimens.mediumPadding),
@@ -464,14 +477,14 @@ fun ImageCropperScreen(navController: NavController) {
                         Icon(Icons.Default.Code, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(Dimens.iconSmall))
                         Spacer(modifier = Modifier.width(Dimens.mediumPadding))
                         Text(
-                            text = "Powered by Krop v${getKropVersion()}",
+                            text = stringResource(R.string.powered_by, getKropVersion()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                     Spacer(modifier = Modifier.height(Dimens.smallPadding))
                     Text(
-                        text = "📁 Tap 'My Scans' to manage your documents",
+                        text = stringResource(R.string.manage_docs_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -480,7 +493,6 @@ fun ImageCropperScreen(navController: NavController) {
         }
     }
 }
-
 // ✅ Move all helpers OUTSIDE the @Composable
 
 @Composable
@@ -515,7 +527,7 @@ fun createKropStyle() = cropperStyle(
 
 fun getKropVersion(): String = "0.2.0"
 
-suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context): Uri? = withContext(Dispatchers.IO) {
+suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context, errorMessage: String): Uri? = withContext(Dispatchers.IO) {
     val contentValues = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, "Scan_${System.currentTimeMillis()}.jpg")
         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
@@ -531,7 +543,7 @@ suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context): Uri? = withCo
     try {
         resolver.openOutputStream(uri)?.use { stream ->
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
-                throw Exception("Failed to compress bitmap")
+                throw Exception(errorMessage)
             }
         }
 
@@ -548,7 +560,7 @@ suspend fun saveImageToGalleryQ(bitmap: Bitmap, context: Context): Uri? = withCo
     }
 }
 
-suspend fun saveImageToGalleryLegacy(bitmap: Bitmap, context: Context): Uri? = withContext(Dispatchers.IO) {
+suspend fun saveImageToGalleryLegacy(bitmap: Bitmap, context: Context, errorMessage: String): Uri? = withContext(Dispatchers.IO) {
     val contentValues = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, "Scan_${System.currentTimeMillis()}.jpg")
         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
@@ -560,7 +572,7 @@ suspend fun saveImageToGalleryLegacy(bitmap: Bitmap, context: Context): Uri? = w
     try {
         resolver.openOutputStream(uri)?.use { stream ->
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
-                throw Exception("Failed to compress bitmap")
+                throw Exception(errorMessage)
             }
         }
         uri
